@@ -1,0 +1,47 @@
+services:
+  mariadb:
+    build: ./requirements/mariadb
+    container_name: mariadb
+    restart: always
+    env_file: .env
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    networks:
+      - inception
+
+  # WordPress = PHP-FPM-Prozess, der PHP-Code ausfuehrt
+  # Startet nach mariadb, schreibt Dateien ins geteilte Volume
+  wordpress:
+    build: ./requirements/wordpress
+    container_name: wordpress
+    restart: always
+    env_file: .env
+    depends_on:
+      - mariadb
+    volumes:
+      - wordpress_data:/var/www/html
+    networks:
+      - inception
+
+  # Nginx = Reverse Proxy, terminiert TLS, leitet PHP an WordPress weiter
+  # Liest statische Dateien aus demselben Volume wie WordPress
+  nginx:
+    build: ./requirements/nginx
+    container_name: nginx
+    restart: always
+    env_file: .env
+    depends_on:
+      - wordpress
+    ports:
+      - "443:443"
+    volumes:
+      - wordpress_data:/var/www/html
+    networks:
+      - inception
+
+volumes:
+  mariadb_data:
+  wordpress_data:
+
+networks:
+  inception:
