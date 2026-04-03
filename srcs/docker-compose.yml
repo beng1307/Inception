@@ -4,27 +4,31 @@ services:
     container_name: mariadb
     restart: always
     env_file: .env
+    secrets:
+      - db_password
+      - db_root_password
     volumes:
-      - mariadb_data:/var/lib/mysql
+      - ${DATA_PATH}/mariadb:/var/lib/mysql
     networks:
       - inception
 
-  # WordPress = PHP-FPM-Prozess, der PHP-Code ausfuehrt
-  # Startet nach mariadb, schreibt Dateien ins geteilte Volume
+
   wordpress:
     build: ./requirements/wordpress
     container_name: wordpress
     restart: always
     env_file: .env
+    secrets:
+      - db_password
+      - credentials
     depends_on:
       - mariadb
     volumes:
-      - wordpress_data:/var/www/html
+      - ${DATA_PATH}/wordpress:/var/www/html
     networks:
       - inception
 
-  # Nginx = Reverse Proxy, terminiert TLS, leitet PHP an WordPress weiter
-  # Liest statische Dateien aus demselben Volume wie WordPress
+
   nginx:
     build: ./requirements/nginx
     container_name: nginx
@@ -35,13 +39,18 @@ services:
     ports:
       - "443:443"
     volumes:
-      - wordpress_data:/var/www/html
+      - ${DATA_PATH}/wordpress:/var/www/html
     networks:
       - inception
 
-volumes:
-  mariadb_data:
-  wordpress_data:
+
+secrets:
+  db_password:
+    file: ../secrets/db_password.txt
+  db_root_password:
+    file: ../secrets/db_root_password.txt
+  credentials:
+    file: ../secrets/credentials.txt
 
 networks:
   inception:

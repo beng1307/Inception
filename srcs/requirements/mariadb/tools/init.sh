@@ -1,32 +1,49 @@
 #!/bin/bash
 
+# Activates errors
 set -e
 
-# MariaDB runtime directories must exist and be writable by mysql.
+
+# Variables
+DB_PASSWORD="$(cat /run/secrets/db_password)"
+DB_ROOT_PASSWORD="$(cat /run/secrets/db_root_password)"
+
+
+# Creates the necessary directories and sets the ownership
 mkdir -p /run/mysqld /var/lib/mysql
 chown -R mysql:mysql /run/mysqld /var/lib/mysql
 
-# Start temporary server for idempotent SQL initialization.
-mysqld_safe --skip-networking &
 
-# Wait until local socket is ready.
-until mysqladmin ping --silent; do
-	sleep 1
-done
-
-if mysql -uroot -p"${ROOT_PASSWORD}" -e "SELECT 1;" >/dev/null 2>&1; then
-	MYSQL_AUTH=( -uroot -p"${ROOT_PASSWORD}" )
-else
-	MYSQL_AUTH=()
+# Initializes the database
+if [ ! -d "/var/lib/mysql/mysql" ]; then
+	mariadb-install-db --user=mysql --datadir=/var/lib/mysql
 fi
 
-mysql "${MYSQL_AUTH[@]}" -e "CREATE DATABASE IF NOT EXISTS ${DATABASE};"
-mysql "${MYSQL_AUTH[@]}" -e "CREATE USER IF NOT EXISTS '${USER}'@'%' IDENTIFIED BY '${PASSWORD}';"
-mysql "${MYSQL_AUTH[@]}" -e "GRANT ALL PRIVILEGES ON ${DATABASE}.* TO '${USER}'@'%';"
-mysql "${MYSQL_AUTH[@]}" -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '${ROOT_PASSWORD}';"
-mysql -uroot -p"${ROOT_PASSWORD}" -e "FLUSH PRIVILEGES;"
 
-# Stop temporary server cleanly, then launch final foreground process.
-mysqladmin -uroot -p"${ROOT_PASSWORD}" shutdown
+# Starts a temporary server to create the database and user
+if [ ! -f "/var/lib/mysql/.inception_init_done" ]; then
 
+	#Starts the server without networking
+	mysqld_safe --skip-networking &
+
+	# Waits for the server to be ready
+	until mysqladmin ping --silent; do
+		sleep 1
+	done
+
+	# Creates the database and user, and grants privileges
+	mysql -uroot -p"${DB_ROOT_PASSWORD}" -e "CREATE DATABASE IF NOT EXISTS ${DATABASE};"
+	mysql -uroot -p"${DB_ROOT_PASSWORD}" -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'%' IDENTIFIED BY '${DB_PASSWORD}';"
+	mysql -uroot -p"${DB_ROOT_PASSWORD}" -e "GRANT ALL PRIVILEGES ON ${DATABASE}.* TO '${DB_USER}'@'%';"
+	mysql -uroot -p"${DB_ROOT_PASSWORD}" -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '${DB_ROOT_PASSWORD}';"
+	mysql -uroot -p"${DB_ROOT_PASSWORD}" -e "FLUSH PRIVILEGES;"
+
+	# Shuts down the temporary server
+	mysqladmin -uroot -p"${DB_ROOT_PASSWORD}" shutdown
+
+	# Creates a file as a flag that it's initialized
+	touch /var/lib/mysql/.inception_init_done
+fi
+
+# Starts the server
 exec mysqld_safe

@@ -1,4 +1,7 @@
 [mysqld]
 
+; Listen on all network interfaces so other containers can connect
 bind-address = 0.0.0.0
+
+; MariaDB port
 port = 3306

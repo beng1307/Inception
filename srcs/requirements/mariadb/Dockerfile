@@ -10,8 +10,7 @@ RUN apt-get update && apt-get install -y mariadb-server
 COPY conf/config.cnf /etc/mysql/mariadb.conf.d/
 
 
-# It copies the init into the container and makes it executable,
-# without it the container does't have the init file
+# It copies the init into the container and makes it executable
 COPY tools/init.sh /init.sh
 RUN chmod +x /init.sh
 

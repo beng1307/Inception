@@ -4,14 +4,17 @@ COMPOSE_FILE = srcs/docker-compose.yml
 ENV_FILE = srcs/.env
 COMPOSE = docker compose -f $(COMPOSE_FILE) --env-file $(ENV_FILE)
 
-.PHONY: all up build down stop restart logs ps clean fclean re
+.PHONY: all prepare-data up build down stop restart logs ps clean fclean re
 
 all: up
 
-up:
+prepare-data:
+	@set -a; . $(ENV_FILE); set +a; mkdir -p $$DATA_PATH/mariadb $$DATA_PATH/wordpress
+
+up: prepare-data
 	$(COMPOSE) up -d --build
 
-build:
+build: prepare-data
 	$(COMPOSE) build
 
 down:
